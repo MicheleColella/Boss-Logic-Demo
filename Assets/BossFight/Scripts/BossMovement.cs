@@ -670,7 +670,6 @@ public class BossMovement : MonoBehaviour
     private void IsGettingDamaged()
     {
         isDamaged = true;
-        damageResetTimer = damageResetDelay; // Set the damage reset timer to the delay value
     }
 
     private void OnDrawGizmos()
