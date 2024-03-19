@@ -72,7 +72,6 @@ public class BossMovement : MonoBehaviour
     public float damageDuration = 3f; // Durata del danneggiamento in secondi
     [SerializeField] private float damageResetDelay = 5f;
     private float damageTimer = 0f;
-    private float damageResetTimer = 0f;
 
     private float timer;
     private float phaseTimer;
