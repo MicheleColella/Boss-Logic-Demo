@@ -5,9 +5,15 @@ using UnityEngine;
 public class BossMovement : MonoBehaviour
 {
     public Transform player;
-    [SerializeField] private BossPhase currentPhase = BossPhase.Follow; // Starting phase is Follow
+    public BossPhase currentPhase = BossPhase.Follow; // Starting phase is Follow
     public float playerDistance;
     public bool PhaseDebug;
+
+    [Header("Movement Dynamics")]
+    public float accelerationTime = 2f; // Tempo per raggiungere la velocità massima
+    private float movementSpeed = 0f; // Velocità corrente del movimento, che varierà
+    private float speedSmoothVelocity = 0f; // Variabile di utilità per SmoothDamp
+
 
     [Header("Phase Permissions")]
     public bool canFollow;
@@ -17,6 +23,7 @@ public class BossMovement : MonoBehaviour
     public bool canDefend;
     public bool canRetreat;
     public bool canApproach;
+    public bool canRun;
 
     [Header("Phase Manager")]
     public float intervalPhaseChanger = 1f;
@@ -27,6 +34,7 @@ public class BossMovement : MonoBehaviour
     public bool isDefendPhase = false;
     public bool isRetreatPhase = false;
     public bool isApproachPhase = false;
+    public bool isRunPhase = false;
 
     [Header("Follow Phase Settings")]
     public float moveSpeed = 5f;
@@ -37,6 +45,8 @@ public class BossMovement : MonoBehaviour
     public float maxfollowDuration = 10f;
 
     [Header("Guard Phase Settings")]
+    public bool isGuardingRight = false;
+    public bool isGuardingLeft = false;
     public float rotationSpeed = 50f; // La velocità di rotazione
     public float minguardPhaseDuration = 5f;
     public float maxguardPhaseDuration = 10f;
@@ -66,12 +76,20 @@ public class BossMovement : MonoBehaviour
     public float moveApproachSpeed = 3f;
     public float minApproachDuration = 5f;
     public float maxApproachDuration = 10f;
+    [SerializeField] private float approachAccelerationTime = 2f;
+
+    [Header("Run Phase Settings")]
+    public float moveRunSpeed = 3f;
+    public float minRunDuration = 5f;
+    public float maxRunDuration = 10f;
+    [SerializeField] private float runAccelerationTime = 2f;
 
     [Header("Damage Manager")]
     public bool isDamaged = false;
     public float damageDuration = 3f; // Durata del danneggiamento in secondi
     [SerializeField] private float damageResetDelay = 5f;
     private float damageTimer = 0f;
+
 
     private float timer;
     private float phaseTimer;
@@ -82,10 +100,11 @@ public class BossMovement : MonoBehaviour
     private float followTimer;
     private float retretatTimer;
     private float approachTimer;
+    private float runTimer;
 
     private int chosedDirection = 0;
 
-    private enum BossPhase
+    public enum BossPhase
     {
         Attack,
         Guard,
@@ -93,7 +112,8 @@ public class BossMovement : MonoBehaviour
         Follow,
         Idle,
         Retreat,
-        Approach
+        Approach,
+        Run
     }
 
     private void Start()
@@ -106,9 +126,10 @@ public class BossMovement : MonoBehaviour
         isAttackPhase = false;
         isDefendPhase = false;
         isRetreatPhase = false;
+        isRunPhase = false;
     }
 
-    private void Update()
+    private void FixedUpdate()
     {
         playerDistance = Vector3.Distance(transform.position, player.position);
 
@@ -136,10 +157,19 @@ public class BossMovement : MonoBehaviour
             case BossPhase.Approach:
                 ApproachPhase();
                 break;
+            case BossPhase.Run:
+                RunPhase();
+                break;
             default:
                 Debug.LogError("Unhandled boss phase.");
                 break;
         }
+        BossLogic();
+    }
+
+    //Logica del boss
+    private void BossLogic()
+    {
 
         //Timer per calcolare l'ultima posizione
         timer -= Time.deltaTime;
@@ -174,38 +204,38 @@ public class BossMovement : MonoBehaviour
         {
             if (isDamaged && !isAttackPhase && !isDefendPhase && !isRetreatPhase && !isFollowPhase)
             {
-                
-                    // Reset the timers for other phases
-                    idleTimer = Random.Range(minIdleDuration, maxIdleDuration);
-                    guardTimer = Random.Range(minguardPhaseDuration, maxguardPhaseDuration);
-                    approachTimer = Random.Range(minApproachDuration, maxApproachDuration);
 
-                    // Choose a random phase to switch to
-                    int chosePhase = Random.Range(0, 3);
+                // Reset the timers for other phases
+                idleTimer = Random.Range(minIdleDuration, maxIdleDuration);
+                guardTimer = Random.Range(minguardPhaseDuration, maxguardPhaseDuration);
+                approachTimer = Random.Range(minApproachDuration, maxApproachDuration);
 
-                    // Stop the current phase and switch to one of the available phases
-                    if (chosePhase == 0)
-                    {
-                        Debug.Log("Follow");
-                        SwitchPhase(BossPhase.Follow); // Switch to the follow phase
-                    }
-                    else if (chosePhase == 1)
-                    {
-                        Debug.Log("Defend");
-                        SwitchPhase(BossPhase.Defend); // Switch to the defend phase
-                    }
-                    else if (chosePhase == 2)
-                    {
-                        Debug.Log("Retreat");
-                        SwitchPhase(BossPhase.Retreat); // Switch to the retreat phase
-                    }
+                // Choose a random phase to switch to
+                int chosePhase = Random.Range(0, 3);
 
-                    // Reset the damage flag
-                    isDamaged = false;
+                // Stop the current phase and switch to one of the available phases
+                if (chosePhase == 0)
+                {
+                    Debug.Log("Follow");
+                    SwitchPhase(BossPhase.Follow); // Switch to the follow phase
+                }
+                else if (chosePhase == 1)
+                {
+                    Debug.Log("Defend");
+                    SwitchPhase(BossPhase.Defend); // Switch to the defend phase
+                }
+                else if (chosePhase == 2)
+                {
+                    Debug.Log("Retreat");
+                    SwitchPhase(BossPhase.Retreat); // Switch to the retreat phase
+                }
+
+                // Reset the damage flag
+                isDamaged = false;
             }
 
 
-            if (!isApproachPhase && !isAttackPhase && !isDefendPhase && !isFollowPhase && !isGuardPhase && !isIdlePhase && !isRetreatPhase)
+            if (!isApproachPhase && !isAttackPhase && !isDefendPhase && !isFollowPhase && !isGuardPhase && !isIdlePhase && !isRetreatPhase && !isRunPhase)
             {
                 //Timer per il cambio di fase
                 phaseTimer -= Time.deltaTime;
@@ -215,12 +245,20 @@ public class BossMovement : MonoBehaviour
             {
                 if (playerDistance > 15f)
                 {
-                    SwitchPhase(BossPhase.Approach);
+                    int firstPhaseChosed = Random.Range(0, 2);
+                    if (firstPhaseChosed == 0)
+                    {
+                        SwitchPhase(BossPhase.Approach);
+                    }
+                    else if (firstPhaseChosed == 1)
+                    {
+                        SwitchPhase(BossPhase.Run);
+                    }
                 }
                 else if (playerDistance <= 15f && playerDistance >= 10f)
                 {
                     // Maggiormente in Guard
-                    int phase2Chosed = Random.Range(0, 3);
+                    int phase2Chosed = Random.Range(0, 4);
                     if (phase2Chosed == 0)
                     {
                         SwitchPhase(BossPhase.Idle);
@@ -245,6 +283,10 @@ public class BossMovement : MonoBehaviour
                             SwitchPhase(BossPhase.Idle);
                         }
                     }
+                    else if (phase2Chosed == 3)
+                    {
+                        SwitchPhase(BossPhase.Run);
+                    }
                 }
                 else if (playerDistance < 10f && playerDistance > maxAttackDistance)
                 {
@@ -264,19 +306,19 @@ public class BossMovement : MonoBehaviour
                 }
                 else if (playerDistance <= maxAttackDistance)
                 {
-                        int retreatChance = Random.Range(0, 3); // Aggiungi una probabilità per la ritirata
-                        if (retreatChance == 0)
-                        {
-                            SwitchPhase(BossPhase.Retreat);
-                        }
-                        else if (retreatChance == 1)
-                        {
-                            SwitchPhase(BossPhase.Attack);
-                        }
-                        else if (retreatChance == 2)
-                        {
-                            SwitchPhase(BossPhase.Defend);
-                        }
+                    int retreatChance = Random.Range(0, 3); // Aggiungi una probabilità per la ritirata
+                    if (retreatChance == 0)
+                    {
+                        SwitchPhase(BossPhase.Retreat);
+                    }
+                    else if (retreatChance == 1)
+                    {
+                        SwitchPhase(BossPhase.Attack);
+                    }
+                    else if (retreatChance == 2)
+                    {
+                        SwitchPhase(BossPhase.Defend);
+                    }
                 }
 
                 phaseTimer = intervalPhaseChanger;
@@ -319,11 +361,15 @@ public class BossMovement : MonoBehaviour
             {
                 SwitchPhase(BossPhase.Approach);
             }
+
+            if (Input.GetKeyDown(KeyCode.P)) // Aggiunta della chiave per la fase Retreat
+            {
+                SwitchPhase(BossPhase.Run);
+            }
         }
     }
 
-
-
+    //Funzione di cambio fase
     private void SwitchPhase(BossPhase newPhase)
     {
         currentPhase = newPhase;
@@ -338,6 +384,7 @@ public class BossMovement : MonoBehaviour
                 isDefendPhase = false;
                 isFollowPhase = false;
                 isRetreatPhase = false;
+                isRunPhase = false;
                 isAttackPhase = true;
                 break;
             case BossPhase.Guard:
@@ -348,6 +395,7 @@ public class BossMovement : MonoBehaviour
                 isDefendPhase = false;
                 isFollowPhase = false;
                 isRetreatPhase = false;
+                isRunPhase = false;
                 isGuardPhase = true;
                 break;
             case BossPhase.Defend:
@@ -358,6 +406,7 @@ public class BossMovement : MonoBehaviour
                 isApproachPhase = false;
                 isFollowPhase = false;
                 isRetreatPhase = false;
+                isRunPhase = false;
                 isDefendPhase = true;
                 break;
             case BossPhase.Follow:
@@ -368,6 +417,7 @@ public class BossMovement : MonoBehaviour
                 isApproachPhase = false;
                 isDefendPhase = false;
                 isRetreatPhase = false;
+                isRunPhase = false;
                 isFollowPhase = true;
                 break;
             case BossPhase.Idle:
@@ -378,6 +428,7 @@ public class BossMovement : MonoBehaviour
                 isDefendPhase = false;
                 isFollowPhase = false;
                 isRetreatPhase = false;
+                isRunPhase = false;
                 isIdlePhase = true;
                 break;
             case BossPhase.Retreat:
@@ -388,7 +439,9 @@ public class BossMovement : MonoBehaviour
                 isApproachPhase = false;
                 isDefendPhase = false;
                 isFollowPhase = false;
+                isRunPhase = false;
                 isRetreatPhase = true;
+                movementSpeed = retreatDistance;
                 break;
             case BossPhase.Approach:
                 approachTimer = Random.Range(minApproachDuration, maxApproachDuration);
@@ -398,7 +451,19 @@ public class BossMovement : MonoBehaviour
                 isDefendPhase = false;
                 isFollowPhase = false;
                 isRetreatPhase = false;
+                isRunPhase = false;
                 isApproachPhase = true;
+                break;
+            case BossPhase.Run:
+                runTimer = Random.Range(minRunDuration, maxRunDuration);
+                isGuardPhase = false;
+                isAttackPhase = false;
+                isIdlePhase = false;
+                isDefendPhase = false;
+                isFollowPhase = false;
+                isRetreatPhase = false;
+                isApproachPhase = false;
+                isRunPhase = true;
                 break;
             default:
                 Debug.LogError("Unhandled boss phase.");
@@ -407,7 +472,7 @@ public class BossMovement : MonoBehaviour
     }
 
 
-
+    //Funzioni delle fasi del boss
     private void GuardPhase()
     {
         if (isGuardPhase)
@@ -417,6 +482,10 @@ public class BossMovement : MonoBehaviour
                 int directionChosing = Random.Range(0, 2);
                 guardDirection = directionChosing == 0 ? -1 : 1;
                 chosedDirection++;
+
+                // Imposta le variabili di direzione in base alla direzione scelta
+                isGuardingRight = guardDirection == 1;
+                isGuardingLeft = guardDirection == -1;
             }
 
             guardTimer -= Time.deltaTime;
@@ -426,6 +495,10 @@ public class BossMovement : MonoBehaviour
                 isGuardPhase = false;
                 chosedDirection = 0;
                 guardTimer = Random.Range(minguardPhaseDuration, maxguardPhaseDuration);
+
+                // Reset delle variabili di direzione quando la fase di guardia termina
+                isGuardingRight = false;
+                isGuardingLeft = false;
             }
             else
             {
@@ -443,9 +516,6 @@ public class BossMovement : MonoBehaviour
             }
         }
     }
-
-
-
 
     private void AttackPhase()
     {
@@ -581,17 +651,15 @@ public class BossMovement : MonoBehaviour
             }
             else
             {
+                float targetSpeed = retreatDistance; // Puoi scegliere una velocità specifica per il retreat
+                                                     // Applica l'accelerazione
+                movementSpeed = Mathf.SmoothDamp(movementSpeed, targetSpeed, ref speedSmoothVelocity, accelerationTime);
+
+                Vector3 direction = (transform.position - player.position).normalized;
+                Vector3 move = direction * movementSpeed * Time.deltaTime;
+                transform.position += move;
+
                 transform.LookAt(player.position);
-                // Calcola la direzione in cui il boss deve indietreggiare
-                Vector3 retreatDirection = transform.position - player.position;
-                retreatDirection.y = 0; // Assicura che l'indietreggiamento sia solo lungo l'asse X e Z
-                retreatDirection.Normalize();
-
-                // Calcola la posizione di destinazione per l'indietreggiamento
-                Vector3 retreatPosition = transform.position + retreatDirection * retreatDistance * Time.deltaTime;
-
-                // Muovi il boss verso la posizione di destinazione
-                transform.position = retreatPosition;
             }
         }
     }
@@ -609,69 +677,52 @@ public class BossMovement : MonoBehaviour
             }
             else
             {
-                // Check if player variable is assigned correctly
-                if (player == null)
-                {
-                    Debug.LogError("Player variable is not assigned correctly.");
-                    return;
-                }
+                float targetSpeed = moveApproachSpeed;
+                // Usa approachAccelerationTime per applicare un'accelerazione specifica durante l'Approach
+                movementSpeed = Mathf.SmoothDamp(movementSpeed, targetSpeed, ref speedSmoothVelocity, approachAccelerationTime);
+
+                Vector3 direction = (player.position - transform.position).normalized;
+                Vector3 move = direction * movementSpeed * Time.deltaTime;
+                transform.position += move;
+
                 transform.LookAt(player.position);
-
-                // Calculate direction towards the player
-                Vector3 direction = player.position - transform.position;
-                float distanceToPlayer = direction.magnitude; // Distance to player
-
-                // Check if the boss is within the minimum chase distance
-                if (distanceToPlayer <= minChaseDistance)
-                {
-                    // Boss is already within minimum chase distance, do nothing
-                    isApproachPhase = false;
-                    return;
-                }
-
-
-                direction.Normalize();
-
-                // Cast a ray downwards to detect the ground
-                RaycastHit hit;
-                if (Physics.Raycast(transform.position, Vector3.down, out hit))
-                {
-                    // Check if the ray hits the ground
-                    if (hit.collider.CompareTag("Ground"))
-                    {
-                        // Calculate new boss position on the ground
-                        Vector3 newPosition = hit.point;
-
-                        // Adjust the Y position slightly above the ground to avoid clipping
-                        newPosition.y += yOffset;
-
-                        // Move boss towards the player only on the X and Z axes
-                        Vector3 targetPosition = newPosition + direction * moveApproachSpeed * Time.deltaTime;
-                        targetPosition.y = newPosition.y; // Maintain the Y position
-
-                        // Update boss position
-                        transform.position = targetPosition;
-                    }
-                    else
-                    {
-                        // If the ray does not hit the ground, do nothing (this can happen if there's no ground below)
-                        Debug.LogWarning("No ground detected beneath the boss.");
-                    }
-                }
-                else
-                {
-                    // If raycast fails, do nothing
-                    Debug.LogWarning("Raycast failed to detect ground.");
-                }
             }
         }
     }
+
+    private void RunPhase()
+    {
+        if (isRunPhase)
+        {
+            runTimer -= Time.deltaTime;
+
+            if (runTimer <= 0f)
+            {
+                isRunPhase = false;
+                runTimer = Random.Range(minRunDuration, maxRunDuration);
+            }
+            else
+            {
+                float targetSpeed = moveRunSpeed;
+                // Usa approachAccelerationTime per applicare un'accelerazione specifica durante l'Approach
+                movementSpeed = Mathf.SmoothDamp(movementSpeed, targetSpeed, ref speedSmoothVelocity, runAccelerationTime);
+
+                Vector3 direction = (player.position - transform.position).normalized;
+                Vector3 move = direction * movementSpeed * Time.deltaTime;
+                transform.position += move;
+
+                transform.LookAt(player.position);
+            }
+        }
+    }
+
 
     private void IsGettingDamaged()
     {
         isDamaged = true;
     }
 
+    //Debug visivo
     private void OnDrawGizmos()
     {
         // Disegna un wireframe sferico intorno al boss per indicare il range di attacco
@@ -689,8 +740,6 @@ public class BossMovement : MonoBehaviour
         }
     }
 
-
-    // Funzione per disegnare una freccia
     private void DrawArrow(Vector3 startPos, Vector3 direction, Color color)
     {
         Gizmos.color = color;
