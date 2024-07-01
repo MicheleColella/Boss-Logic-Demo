@@ -18,4 +18,4 @@ The project is optimized for compatibility with Unity 3D, ensuring it fits seaml
 Designed with user-friendliness in mind, the system emphasizes ease of use and configuration, enabling developers to integrate and customize the boss behavior in just a few steps.
 
 ## License
-This project is licensed under the MIT License. See the `LICENSE` file for more details.
+This project is licensed under the Apache-2.0 license. See the `LICENSE` file for more details.
